@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Models\" />
+    <Folder Include="Jobs\" />
+    <Folder Include="Configuration\" />
+    <Folder Include="Services\DailyPicks\Processing\" />
+    <Folder Include="Services\IngestionEngine\IngestionWorker\" />
+    <Folder Include="Services\PredictionEngine\Models\" />
+    <Folder Include="Services\PredictionEngine\Scoring\" />
+    <Folder Include="Services\SmartMoney\Models\" />
+    <Folder Include="Services\SmartMoney\Scoring\" />
+    <Folder Include="Services\TipsterRanking\Abstractions\" />
+    <Folder Include="Services\TipsterRanking\DTOs\" />
+    <Folder Include="Services\TipsterRanking\Processing\" />
+    <Folder Include="Validators\" />
+    <Folder Include="Parsers\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Analytics\Analytics.csproj" />
+    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
+    <ProjectReference Include="..\SharedKernel\SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

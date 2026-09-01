@@ -1,0 +1,38 @@
+SPORTS BETTING AI - MASTER ARCHITECTURE (WORKING DOCUMENT)
+
+CURRENT STATUS
+
+FOUNDATION - ✔ Ingestion - ✔ Database - ✔ Match synchronization - ✔
+TeamForm generation - ✔ Prediction generation pipeline - ✔ Validation
+pipeline - ✔ Strategy performance tracking
+
+STRATEGIES - ✔ MatchResultStrategy (active) - ✔ BTTSStrategy (active) -
+◐ Over25Strategy (in progress) - ☐ Over15Strategy - ☐ Under25Strategy -
+☐ DoubleChanceStrategy
+
+ANALYTICS - ✔ Confidence calibration - ✔ Portfolio selection - ✔
+Prediction validation - ✔ Strategy performance service
+
+AI OPTIMIZATION Current: - StrategyMutationEngine (temporary)
+
+Target: - StrategyEvaluationService - StrategyActivationService -
+StrategyMutator - MutationFactory - MutationPlan
+
+ROADMAP
+
+PHASE 1 - Finish Over25Strategy using ranking model instead of
+hard-coded rules.
+
+PHASE 2 - Build GoalScoringService and GoalScoringProfile. - Refactor
+BTTS and Over25 to consume shared scoring profiles.
+
+PHASE 3 - Replace StrategyMutationEngine with the modular optimization
+architecture: 1. StrategyEvaluationService 2. StrategyActivationService
+3. StrategyMutator 4. MutationFactory 5. MutationPlan
+
+PHASE 4 - Kelly staking - Portfolio optimization - Closing line value -
+Odds movement - Injury model - Market intelligence
+
+RULE Never duplicate logic between strategies. Shared football
+intelligence belongs in shared services (GoalScoringService,
+FormAnalysisService, etc.).

@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="AI/AI.csproj" Id="160eafe7-ef5e-4237-90a1-bd54cb6d408c" />
+  <Project Path="Analytics/Analytics.csproj" Id="c5be5a3e-bb98-4b4e-9b50-c02a47efe060" />
+  <Project Path="Api/Api.csproj" Id="b0ab8327-9425-41e9-8825-93336720b684" />
+  <Project Path="Backtesting/Backtesting.csproj" Id="a4d4d373-fee8-46d2-9690-367dab6eeafe" />
+  <Project Path="Betting/Betting.csproj" Id="65dea424-ef62-4eb6-9116-27d30a96bfbf" />
+  <Project Path="Infrastructure/Infrastructure.csproj" />
+  <Project Path="Ingestion/Ingestion.csproj" Id="5aacd62e-e435-4ad0-b45b-19bc960dc71a" />
+  <Project Path="Management/Management.csproj" Id="06887ddc-e8f3-4498-a862-0bc40c6aa78e" />
+  <Project Path="SharedKernel/SharedKernel.csproj" />
+</Solution>

@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AI\AI.csproj" />
+    <ProjectReference Include="..\Analytics\Analytics.csproj" />
+    <ProjectReference Include="..\Betting\Betting.csproj" />
+    <ProjectReference Include="..\Ingestion\Ingestion.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Services\Factories\" />
+    <Folder Include="Services\Orchestration\" />
+  </ItemGroup>
+
+</Project>
