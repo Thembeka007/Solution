@@ -26,9 +26,9 @@ public class MatchOdds : AuditableEntity
 
     public bool IsClosingOdds { get; set; }
 
-    // ======================================================
-    // PROBABILITIES  -- not using this section yet, why?
-    // ======================================================
+    // ===============================================
+    // PROBABILITIES  
+    // ===============================================
 
     public decimal HomeImpliedProbability { get; set; }
 

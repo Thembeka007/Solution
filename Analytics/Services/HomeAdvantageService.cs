@@ -1,11 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-namespace Analytics.Services;
+﻿namespace Analytics.Services;
 
 public class HomeAdvantageService
 {
-    public decimal GetMultiplier()
+    public decimal GetMultiplier(
+        decimal multiplier)
     {
-        return 1.15m;
+        return multiplier;
     }
 }

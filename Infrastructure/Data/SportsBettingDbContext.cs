@@ -59,6 +59,9 @@ public class SportsBettingDbContext : DbContext
         StrategyReplacements
         => Set<StrategyReplacement>();
 
+    public DbSet<TeamExternalMapping>
+        TeamExternalMappings { get; set; }
+
     // =========================
     // BETTING
     // =========================

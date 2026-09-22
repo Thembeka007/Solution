@@ -42,8 +42,8 @@ public class GenomeCloneService
         return await CloneFromGenomeAsync(
             _familyService.GetFamily(
                 sourceStrategy),
-                sourceStrategy,
-                genome.Parameters);
+             sourceStrategy,
+             genome.Parameters);
     }
 
     // =====================================
@@ -53,16 +53,43 @@ public class GenomeCloneService
     public async Task<string> CloneFromGenomeAsync(
         string family,
         string parentStrategyVersion,
-        Dictionary<string, decimal> genome)
+        Dictionary<string, decimal> genome,
+        string? secondParentStrategyVersion = null)
     {
         var newVersion =
             $"{family}_MUTATED_{DateTime.UtcNow.Ticks}";
+
+        // ===================================
+        // LOAD PRIMARY PARENT
+        // ===================================
 
         var parent =
             await _db.StrategyPerformances
                 .FirstOrDefaultAsync(x =>
                     x.StrategyVersion ==
                     parentStrategyVersion);
+
+        // ===================================
+        // LOAD SECOND PARENT
+        // ===================================
+
+        StrategyPerformance? secondParent = null;
+
+        if (!string.IsNullOrWhiteSpace(
+                secondParentStrategyVersion))
+        { 
+
+            secondParent =
+                await _db.StrategyPerformances
+                    .FirstOrDefaultAsync(x =>
+                        x.StrategyVersion ==
+                        secondParentStrategyVersion);
+
+        }
+
+        // ===================================
+        // CREATE CHILD PARAMETERS
+        // ===================================
 
         foreach (var parameter in genome)
         {
@@ -99,10 +126,13 @@ public class GenomeCloneService
                 ParentStrategyId =
                     parent?.Id,
 
+                SecondParentStrategyId =
+                    secondParent?.Id,
+
                 Generation =
                     parent == null
-                    ? 0
-                    : parent.Generation + 1,
+                        ? 0
+                        : parent.Generation + 1,
 
                 ROI =
                     0,
@@ -134,6 +164,18 @@ public class GenomeCloneService
                 IsActive =
                     false,
 
+                IsMature =
+                    false,
+
+                IsElite =
+                    false,
+
+                LaboratoryPassed =
+                    false,
+
+                LaboratoryEvaluatedUtc =
+                    null,
+
                 LastEvaluationUtc =
                     DateTime.UtcNow
             });
@@ -144,7 +186,9 @@ public class GenomeCloneService
             """
             Genome created
 
-            Parent={parent}
+            ParentA={parentA}
+
+            ParentB={parentB}
 
             Child={child}
 
@@ -155,6 +199,7 @@ public class GenomeCloneService
             Parameters={count}
             """,
             parentStrategyVersion,
+            secondParentStrategyVersion ?? "None",
             newVersion,
             family,
             parent?.Generation + 1 ?? 0,

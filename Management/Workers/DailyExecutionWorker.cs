@@ -7,14 +7,11 @@ using Betting.Services;
 using Betting.Settlement;
 using Infrastructure.Data;
 using Ingestion.FootballData.Services;
-using Ingestion.Odds.Services;
 using Management.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using SharedKernel.Entities;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
 namespace Management.Workers;
@@ -98,11 +95,6 @@ public class DailyExecutionWorker : BackgroundService
                     scope.ServiceProvider
                         .GetRequiredService<
                             ConfidenceCalibrationService>();
-
-                var mutationEngine =
-                    scope.ServiceProvider
-                        .GetRequiredService<
-                            StrategyMutationEngine>();
 
                 var replacementService =
                     scope.ServiceProvider
@@ -323,11 +315,6 @@ public class DailyExecutionWorker : BackgroundService
 
                 await mutationExecutor
                     .ExecuteAsync(mutationPlans);
-
-                // APPLY MUTATIONS
-
-                await mutationEngine
-                    .ApplyMutationsAsync(mutationPlans);
 
                 _logger.LogInformation("Mutation execution complete.");
 

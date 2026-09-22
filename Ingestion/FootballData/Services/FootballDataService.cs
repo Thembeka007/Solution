@@ -73,39 +73,51 @@ public class FootballDataService
         var apiKey =
             _config["FootballData:Api_Key"];
 
-        var backtestingrequest =
-            new HttpRequestMessage(
-                HttpMethod.Get,
-                $"https://api.football-data.org/v4/competitions/" +
-                $"{competitionCode}/matches");
-
         var request =
             new HttpRequestMessage(
                 HttpMethod.Get,
                 $"https://api.football-data.org/v4/competitions/" +
-                $"{competitionCode}/matches?status=SCHEDULED");
+                $"{competitionCode}/matches");
 
         request.Headers.Add(
             "X-Auth-Token",
             apiKey);
 
         _logger.LogInformation(
-    "Requesting competition {competition}",
-    competitionCode);
+            "Requesting competition {competition}",
+            competitionCode);
 
         var response =
             await _httpClient.SendAsync(
                 request);
 
         _logger.LogInformation(
-    "Response status {status}",
-    response.StatusCode);
+            "Response status {status}",
+            response.StatusCode);
 
         if (response.StatusCode ==
-            System.Net.HttpStatusCode.TooManyRequests)
+            HttpStatusCode.TooManyRequests)
         {
+            var retryAfter =
+                    response.Headers.RetryAfter;
+
+            var responseBody =
+                await response.Content
+                    .ReadAsStringAsync();
+
             _logger.LogWarning(
-                "FootballData rate limit reached.");
+                """
+                FootballData rate limit reached.
+
+                Competition={competition}
+
+                RetryAfter={retryAfter}
+
+                ResponseBody={responseBody}
+                """,
+                competitionCode,
+                retryAfter?.ToString() ?? "Not provided",
+                responseBody);
 
             return new List<MatchDto>();
         }
@@ -132,6 +144,7 @@ public class FootballDataService
         return result?.Matches
             ?? new List<MatchDto>();
     }
+
     public async Task<MatchDto?> GetMatchAsync(
         int fixtureId)
     {
@@ -152,7 +165,7 @@ public class FootballDataService
                 request);
 
         if (response.StatusCode ==
-            System.Net.HttpStatusCode.TooManyRequests)
+            HttpStatusCode.TooManyRequests)
         {
             _logger.LogWarning(
                 "FootballData rate limit reached.");

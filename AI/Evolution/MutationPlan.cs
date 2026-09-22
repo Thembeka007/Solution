@@ -16,6 +16,14 @@ public class MutationPlan
 
     public bool DecreaseGoalWeight { get; set; }
 
+    public bool IncreaseMinimumEdgePercent { get; set; }
+
+    public bool DecreaseMinimumEdgePercent { get; set; }
+
+    public bool IncreaseWeakDefenceBonus { get; set; }
+
+    public bool DecreaseWeakDefenceBonus { get; set; }
+
     public bool IncreaseHomeAdvantage { get; set; }
 
     public bool DecreaseHomeAdvantage { get; set; }

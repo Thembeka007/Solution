@@ -1147,6 +1147,9 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("ReplacementTriggered")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid?>("SecondParentStrategyId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("StrategyFamily")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1230,6 +1233,43 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Teams");
+                });
+
+            modelBuilder.Entity("SharedKernel.Entities.TeamExternalMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExternalTeamId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FirstSeenUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("LastSeenUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TeamExternalMappings");
                 });
 
             modelBuilder.Entity("SharedKernel.Entities.TeamForm", b =>

@@ -78,7 +78,7 @@ public class ParentSelectionService
                         x.StrategyVersion ==
                         strategy.StrategyVersion);
 
-            if (parameterCount != 5)
+            if (parameterCount != 6)
             {
                 _logger.LogWarning(
                     """

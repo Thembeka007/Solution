@@ -52,4 +52,8 @@ public class LaboratoryEvaluationSettings
 
     public int MaximumMarketObservationAgeMinutes = 15;
 
+    // ==========================================================
+    // BANKROLL - THEORETICAL: NOTHING TO DO WITH STAKE
+    // ==========================================================
+    public decimal StartingBankroll { get; set; } = 100m;
 }

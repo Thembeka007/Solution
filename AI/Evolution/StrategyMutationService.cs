@@ -73,7 +73,16 @@ public class StrategyMutationService
                         existing.ReduceConfidenceThreshold =
                             true;
                     }
+                    // ROI weakness can indicate that the strategy
+                    // is being too selective.
+                    //
+                    // Explore lower relative-edge requirements
+                    // while preserving the current 15% baseline.
                     
+                    existing.DecreaseMinimumEdgePercent =
+                        true;
+                    
+
                     // No learning model yet
                     existing.DecreaseHomeAdvantage =
                         true;
@@ -93,6 +102,12 @@ public class StrategyMutationService
                         existing.IncreaseGoalWeight =
                             true;
                     }
+
+                    // Accuracy pressure can justify testing
+                    // a more selective relative-edge requirement.
+                    
+                    existing.IncreaseMinimumEdgePercent =
+                        true;
 
                     break;
 
@@ -130,6 +145,39 @@ public class StrategyMutationService
             }
         }
 
+        // =========================================
+        // RESOLVE CONTRADICTORY EDGE MUTATIONS
+        // =========================================
+        //
+        // A child must never receive both an
+        // increase and decrease mutation for the
+        // same parameter.
+        //
+        // =========================================
+
+        foreach (var plan in plans)
+        {
+            if (plan.IncreaseMinimumEdgePercent &&
+                plan.DecreaseMinimumEdgePercent)
+            {
+                // Preserve the decrease direction.
+                // ROI expansion is the primary reason
+                // we introduced this parameter.
+                plan.IncreaseMinimumEdgePercent =
+                    false;
+
+                _logger.LogInformation(
+                    """
+                    Conflicting MinimumEdgePercent mutations resolved
+
+                    Strategy={strategy}
+
+                    Action=DecreaseOnly
+                    """,
+                    plan.StrategyVersion);
+            }
+        }
+
         _logger.LogInformation(
             """
             =========================================
@@ -149,7 +197,7 @@ public class StrategyMutationService
         foreach (var existing in plans)
         {
             _logger.LogInformation(
-                
+
                 """
                 Strategy={strategy}
 
@@ -160,6 +208,10 @@ public class StrategyMutationService
                 IncreaseConfidence={confidence}
                 
                 ReduceConfidence={reduce}
+
+                IncreaseMinimumEdgePercent={increaseMinimumEdge}
+                
+                DecreaseMinimumEdgePercent={decreaseMinimumEdge}
                 
                 HomeAdvantageDown={home}
                 
@@ -171,6 +223,8 @@ public class StrategyMutationService
                 existing.IncreaseGoalWeight,
                 existing.IncreaseConfidenceThreshold,
                 existing.ReduceConfidenceThreshold,
+                existing.IncreaseMinimumEdgePercent,
+                existing.DecreaseMinimumEdgePercent,
                 existing.DecreaseHomeAdvantage,
                 existing.ExpectedImprovement);
         

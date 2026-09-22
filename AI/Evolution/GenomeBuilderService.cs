@@ -13,10 +13,11 @@ public class GenomeBuilderService
     private static readonly Dictionary<string, decimal> DefaultParameters =
         new()
     {
-        ["AttackBonus"] = 1.00m,
-        ["EdgeThreshold"] = 1.00m,
+        ["AttackBonus"] = 0.40m,
+        ["EdgeThreshold"] = 1.50m,
+        ["MinimumEdgePercent"] = 0.15m,
         ["ConfidenceThreshold"] = 60m,
-        ["HomeAdvantageMultiplier"] = 1.10m,
+        ["HomeAdvantageMultiplier"] = 1.15m,
         ["WeakDefenceBonus"] = 0.25m
     };
 

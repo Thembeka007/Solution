@@ -27,13 +27,14 @@ using Ingestion.Odds.Configuration;
 using Ingestion.Odds.Providers;
 using Ingestion.Odds.Services;
 using Ingestion.Services;
+using Ingestion.Teams.Services;
 using Ingestion.Workers;
 using Management.Services;
 using Management.Workers;
 using Microsoft.EntityFrameworkCore;
 using Polly;
 using Serilog;
-using SharedKernel.Entities;
+
 
 var builder =
     WebApplication.CreateBuilder(args);
@@ -126,6 +127,9 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     MatchRefreshService>();
 
+builder.Services.AddScoped<
+    TeamIdentityService>();
+
 builder.Services.AddHttpClient<
     FootballDataService>()
     .AddTransientHttpErrorPolicy(policy =>
@@ -134,6 +138,8 @@ builder.Services.AddHttpClient<
             retry =>
                 TimeSpan.FromSeconds(
                     Math.Pow(2, retry))));
+
+
 
 // ======================================================
 // ANALYTICS SERVICES
@@ -248,10 +254,18 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     ActiveStrategyService>();
 
+builder.Services.AddScoped<
+    MomentumModelService>();
 
-// ======================================================
+builder.Services.AddScoped<
+    HistoricalCandidatePredictionService>();
+
+builder.Services.AddScoped<
+    HistoricalCandidateMarketService>();
+
+// ===================================================
 // BETTING SERVICES
-// ======================================================
+// ===================================================
 
 builder.Services.AddScoped<
     DailyPickSelector>();
@@ -332,9 +346,6 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     ConfidenceTuningService>();
-
-builder.Services.AddScoped<
-    StrategyMutationEngine>();
 
 builder.Services.AddScoped<
     ReinforcementLearningService>();
@@ -441,6 +452,18 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     ConfidenceMarketEdgeAnalyzer>();
 
+builder.Services.AddScoped<
+    LaboratoryCandidateDatasetSplitter>();
+
+builder.Services.AddScoped<
+    LaboratoryCandidateRunner>();
+
+builder.Services.AddScoped<
+    LaboratoryCandidateDatasetEvaluator>();
+
+builder.Services.AddScoped<
+    LaboratoryCandidateGateService>();
+
 // ======================================================
 // MANAGEMENT SERVICES
 // ======================================================
@@ -531,6 +554,80 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+
+// =====================================================
+// LABORATORY CANDIDATE DIAGNOSTIC
+// =====================================================
+//
+// Run with:
+//
+// --lab-candidate
+//
+// This executes the laboratory candidate runner once
+// and exits without starting the background workers.
+//
+// =====================================================
+
+if (args.Contains(
+        "--lab-candidate",
+        StringComparer.OrdinalIgnoreCase))
+{
+    using var scope =
+        app.Services.CreateScope();
+
+    var runner =
+        scope.ServiceProvider
+            .GetRequiredService<
+                LaboratoryCandidateRunner>();  
+
+    var result =
+            await runner.RunAsync(
+                "MOMENTUM_V1_MUTATED_639250732347887920",
+                300);
+
+    Log.Information(
+        """
+        ========================================
+        LABORATORY CANDIDATE RUN COMPLETE
+
+        Strategy={strategy}
+
+        MatchesExamined={matches}
+
+        MatchesSkipped={skipped}
+
+        PredictionsGenerated={predictions}
+
+        ValidMarketData={marketData}
+
+        SettledPredictions={settled}
+
+        CorrectPredictions={correct}
+
+        Accuracy={accuracy:F2}%
+
+        Profit={profit:F2}
+
+        ROI={roi:F2}%
+
+        ========================================
+        """,
+        result.StrategyVersion,
+        result.MatchesExamined,
+        result.MatchesSkipped,
+        result.PredictionsGenerated,
+        result.ValidMarketDataPredictions,
+        result.SettledCandidatePredictions,
+        result.CorrectPredictions,
+        result.Accuracy,
+        result.TotalProfit,
+        result.ROI);
+
+    return;
+}
+
+
 
 // =====================================================
 // APPLICATION START

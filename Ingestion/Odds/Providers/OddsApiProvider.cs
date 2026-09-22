@@ -5,6 +5,7 @@ using Ingestion.Odds.Configuration;
 using Ingestion.Odds.DTOs;
 using Ingestion.Odds.DTOs.OddsApi;
 using Ingestion.Odds.Services;
+using Ingestion.Teams.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -26,6 +27,9 @@ public class OddsApiProvider : IOddsProvider
     private readonly SportsBettingDbContext
         _db;
 
+    private readonly TeamIdentityService
+        _teamIdentityService;
+
     private readonly ILogger<OddsApiProvider>
         _logger;
 
@@ -33,11 +37,13 @@ public class OddsApiProvider : IOddsProvider
         IHttpClientFactory httpFactory,
         IOptions<OddsApiOptions> options,
         SportsBettingDbContext db,
+        TeamIdentityService teamIdentityService,
         ILogger<OddsApiProvider> logger)
     {
         _httpFactory = httpFactory;
         _options = options.Value;
         _db = db;
+        _teamIdentityService = teamIdentityService;
         _logger = logger;
     }
 
@@ -70,6 +76,48 @@ public class OddsApiProvider : IOddsProvider
         var response =
             await client
                 .GetAsync(oddsUrl);
+
+        // ==========================================
+        // API USAGE / QUOTA DIAGNOSTICS
+        // ==========================================
+
+        string requestsUsed =
+            response.Headers.TryGetValues(
+                "x-requests-used",
+                out var usedValues)
+                    ? usedValues.FirstOrDefault() ?? "unknown"
+                    : "unknown";
+
+        string requestsRemaining =
+            response.Headers.TryGetValues(
+                "x-requests-remaining",
+                out var remainingValues)
+                    ? remainingValues.FirstOrDefault() ?? "unknown"
+                    : "unknown";
+
+        string requestsLast =
+            response.Headers.TryGetValues(
+                "x-requests-last",
+                out var lastValues)
+                    ? lastValues.FirstOrDefault() ?? "unknown"
+                    : "unknown";
+
+        _logger.LogInformation(
+            """
+            Odds API usage
+
+            Sport={sport}
+
+            RequestsUsed={used}
+
+            RequestsRemaining={remaining}
+
+            RequestsLast={last}
+            """,
+            sportKey,
+            requestsUsed,
+            requestsRemaining,
+            requestsLast);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -174,29 +222,80 @@ public class OddsApiProvider : IOddsProvider
             // -------------------------------------------------
 
             var matchedFixture =
-                matches
-                    .FirstOrDefault(x =>
-                        NormalizeTeamName(
-                            x.HomeTeam!.Name)
-                        ==
-                        NormalizeTeamName(
-                            ev.home_team)
-                        &&
-                        NormalizeTeamName(
-                            x.AwayTeam!.Name)
-                        ==
-                        NormalizeTeamName(
-                            ev.away_team));
+                        await FindMatchingFixtureAsync(
+                            matches,
+                            ev);
 
             if (matchedFixture == null)
             {
                 _logger.LogWarning(
-                    "NO MATCH FOUND: {home} vs {away}",
+                    """
+                    NO MATCH FOUND
+
+                    ProviderHome={providerHome}
+
+                    ProviderAway={providerAway}
+
+                    ProviderCommenceTime={providerTime}
+                    """,
                     ev.home_team,
-                    ev.away_team);
+                    ev.away_team,
+                    ev.commence_time);
 
                 continue;
             }
+
+
+            _logger.LogInformation(
+                """
+                FIXTURE MATCHED
+
+                ProviderHome={providerHome}
+
+                ProviderAway={providerAway}
+
+                DatabaseHome={databaseHome}
+
+                DatabaseAway={databaseAway}
+
+                ProviderCommenceTime={providerTime}
+
+                DatabaseKickoff={databaseKickoff}
+
+                ExternalFixtureId={externalFixtureId}
+                """,
+                ev.home_team,
+                ev.away_team,
+                matchedFixture.HomeTeam!.Name,
+                matchedFixture.AwayTeam!.Name,
+                ev.commence_time,
+                matchedFixture.KickoffUtc,
+                matchedFixture.ExternalFixtureId);
+
+
+            _logger.LogInformation(
+                """
+                 REGISTERING TEAM MAPPINGS
+                
+                 Source=OddsApi
+                 
+                 MatchId={matchId}
+                 
+                 ExternalHome={home}
+                 
+                 ExternalAway={away} 
+                """,
+                matchedFixture.Id,
+                ev.home_team, 
+                ev.away_team);
+
+            await _teamIdentityService
+                .RegisterFixtureMappingsAsync(
+                    matchedFixture,
+                    "OddsApi",
+                    ev.home_team,
+                    ev.away_team);
+
 
             // -------------------------------------------------
             // PROCESS EVERY BOOKMAKER
@@ -461,6 +560,212 @@ public class OddsApiProvider : IOddsProvider
 
     }
 
+    private async Task<Match?> FindMatchingFixtureAsync(
+        List<Match> matches,
+        OddsApiEventDto providerEvent)
+    {
+        var providerHome =
+            NormalizeTeamName(
+                providerEvent.home_team);
+
+        var providerAway =
+            NormalizeTeamName(
+                providerEvent.away_team);
+
+        var providerKickoff =
+            providerEvent.commence_time;
+
+        const double MaximumKickoffDifferenceMinutes = 180;
+
+        // ==========================================
+        // EXISTING NAME-BASED MATCHING
+        // ==========================================
+
+        var candidates =
+            matches
+                .Where(x =>
+                    x.HomeTeam != null &&
+                    x.AwayTeam != null)
+                .Where(x =>
+                    NormalizeTeamName(
+                        x.HomeTeam!.Name) ==
+                    providerHome)
+                .Where(x =>
+                    NormalizeTeamName(
+                        x.AwayTeam!.Name) ==
+                    providerAway)
+                .Select(x =>
+                    new
+                    {
+                        Match = x,
+
+                        Difference =
+                            Math.Abs(
+                                (
+                                    x.KickoffUtc -
+                                    providerKickoff
+                                ).TotalMinutes)
+                    })
+                .Where(x =>
+                    x.Difference <=
+                    MaximumKickoffDifferenceMinutes)
+                .OrderBy(x =>
+                    x.Difference)
+                .ToList();
+
+        if (candidates.Count > 0)
+        {
+            if (candidates.Count > 1)
+            {
+                _logger.LogWarning(
+                    """
+                    MULTIPLE FIXTURE MATCHES FOUND
+
+                    ProviderHome={providerHome}
+
+                    ProviderAway={providerAway}
+
+                    ProviderKickoff={providerKickoff}
+
+                    CandidateCount={count}
+
+                    SelectedExternalFixtureId={selected}
+                    """,
+                    providerEvent.home_team,
+                    providerEvent.away_team,
+                    providerKickoff,
+                    candidates.Count,
+                    candidates[0]
+                        .Match
+                        .ExternalFixtureId);
+            }
+
+            return candidates[0].Match;
+        }
+
+        // ==========================================
+        // IDENTITY FALLBACK
+        // ==========================================
+
+        var homeMapping =
+            await _db.TeamExternalMappings
+                .AsNoTracking()
+                .Where(x =>
+                    x.Source == "OddsApi" &&
+                    x.IsActive)
+                .ToListAsync();
+
+
+        var canonicalHomeMapping =
+            homeMapping.FirstOrDefault(x =>
+                NormalizeTeamName(
+                    x.ExternalName) ==
+                providerHome);
+
+        var canonicalAwayMapping =
+            homeMapping.FirstOrDefault(x =>
+                NormalizeTeamName(
+                    x.ExternalName) ==
+                providerAway);
+
+        if (canonicalHomeMapping == null ||
+            canonicalAwayMapping == null)
+        {
+            return null;
+        }
+
+        var identityCandidates =
+            matches
+               .Where(x =>
+                   x.HomeTeam != null &&
+                   x.AwayTeam != null)
+               .Where(x =>
+                   x.HomeTeamId ==
+                   canonicalHomeMapping.TeamId)
+               .Where(x =>
+                   x.AwayTeamId ==
+                   canonicalAwayMapping.TeamId)
+               .Select(x =>
+                   new
+                   {
+                       Match = x,
+                       Difference =
+                           Math.Abs(
+                               (x.KickoffUtc -
+                                providerKickoff)
+                               .TotalMinutes)
+                   })
+               .Where(x =>
+                   x.Difference <=
+                   MaximumKickoffDifferenceMinutes)
+               .OrderBy(x =>
+                   x.Difference)
+               .ToList();
+
+        if (identityCandidates.Count == 0)
+        {
+            return null;
+        }
+
+        if (identityCandidates.Count > 1)
+        {
+            _logger.LogWarning(
+                """
+                MULTIPLE IDENTITY FIXTURE MATCHES FOUND
+
+                ProviderHome={providerHome}
+
+                ProviderAway={providerAway}
+
+                ProviderKickoff={providerKickoff}
+
+                CandidateCount={count}
+
+                SelectedExternalFixtureId={selected}
+                """,
+                providerEvent.home_team,
+                providerEvent.away_team,
+                providerKickoff,
+                identityCandidates.Count,
+                identityCandidates[0]
+                    .Match
+                    .ExternalFixtureId);
+        }
+
+        _logger.LogInformation(
+           """
+            FIXTURE MATCHED VIA IDENTITY
+
+            ProviderHome={providerHome}
+
+            ProviderAway={providerAway}
+
+            CanonicalHomeTeamId={homeTeamId}
+
+            CanonicalAwayTeamId={awayTeamId}
+
+            ProviderKickoff={providerKickoff}
+
+            DatabaseKickoff={databaseKickoff}
+
+            ExternalFixtureId={externalFixtureId}
+            """,
+           providerEvent.home_team,
+           providerEvent.away_team,
+           canonicalHomeMapping.TeamId,
+           canonicalAwayMapping.TeamId,
+           providerKickoff,
+           identityCandidates[0]
+               .Match
+               .KickoffUtc,
+           identityCandidates[0]
+               .Match
+               .ExternalFixtureId);
+
+        return identityCandidates[0].Match;
+    }
+
+
     // =========================================================
     // TEAM NAME NORMALIZATION
     // =========================================================
@@ -468,29 +773,107 @@ public class OddsApiProvider : IOddsProvider
     private static string NormalizeTeamName(
         string name)
     {
-        return name
-            .Trim()
-            .Replace(
-                "United States",
-                "USA",
-                StringComparison.OrdinalIgnoreCase)
-            .Replace(
-                "DR Congo",
-                "Congo DR",
-                StringComparison.OrdinalIgnoreCase)
-            .Replace(
-                "Korea Republic",
-                "South Korea",
-                StringComparison.OrdinalIgnoreCase)
-            .Replace(
-                "Cape Verde Islands",
-                "Cape Verde",
-                StringComparison.OrdinalIgnoreCase)
-            .Replace(
-                "Curacao",
-                "Curaçao",
-                StringComparison.OrdinalIgnoreCase)
-            .ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return string.Empty;
+        }
+
+        var normalized =
+            name
+                .Trim()
+                .ToUpperInvariant();
+
+        normalized =
+            normalized
+                .Replace(
+                    "UNITED STATES",
+                    "USA",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "DR CONGO",
+                    "CONGO DR",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "KOREA REPUBLIC",
+                    "SOUTH KOREA",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "CAPE VERDE ISLANDS",
+                    "CAPE VERDE",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "CURACAO",
+                    "CURACAO",
+                    StringComparison.OrdinalIgnoreCase);
+
+        normalized =
+            normalized
+                .Replace(
+                    "RAYO VALLECANO DE MADRID",
+                    "RAYO VALLECANO",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "RCD ESPANYOL DE BARCELONA",
+                    "ESPANYOL",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "DEPORTIVO ALAVES",
+                    "ALAVES",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "DEPORTIVO ALAVÉS",
+                    "ALAVES",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "VALENCIA CF",
+                    "VALENCIA",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "REAL MADRID CF",
+                    "REAL MADRID",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "RC CELTA DE VIGO",
+                    "CELTA VIGO",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "CA OSASUNA",
+                    "OSASUNA",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "REAL BETIS BALOMPIE",
+                    "REAL BETIS",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "REAL BETIS BALOMPIÉ",
+                    "REAL BETIS",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "REAL SOCIEDAD DE FUTBOL",
+                    "REAL SOCIEDAD",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "REAL SOCIEDAD DE FÚTBOL",
+                    "REAL SOCIEDAD",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "SEVILLA FC",
+                    "SEVILLA",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "ATHLETIC CLUB",
+                    "ATHLETIC BILBAO",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "MALAGA CF",
+                    "MALAGA",
+                    StringComparison.OrdinalIgnoreCase)
+                .Replace(
+                    "MÁLAGA CF",
+                    "MALAGA",
+                    StringComparison.OrdinalIgnoreCase);
+
+        return normalized;
     }
 
     private static DateTime GetProviderUpdatedUtc(

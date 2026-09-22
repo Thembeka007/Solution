@@ -64,6 +64,8 @@ public class StrategyPerformance
 
     public Guid? ParentStrategyId { get; set; }
 
+    public Guid? SecondParentStrategyId { get; set; }
+
     // ======================================
     // EVOLUTION LABORATORY
     // ======================================
